@@ -16,7 +16,7 @@ hiddenimports += collect_submodules('openpyxl')
 hiddenimports += collect_submodules('pandas')
 hiddenimports += collect_submodules('customtkinter')
 
-a = Analysis(['main.py'], pathex=[], binaries=[], datas=datas,
+a = Analysis(['../main.py'], pathex=[], binaries=[], datas=datas,
              hiddenimports=hiddenimports)
 pyz = PYZ(a.pure)
 exe = EXE(pyz,a.scripts,a.binaries,a.datas,name='UnifiedExcelTools',
