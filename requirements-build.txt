@@ -1,0 +1,5 @@
+pyinstaller>=6.0
+customtkinter
+openpyxl
+pandas
+xlrd
