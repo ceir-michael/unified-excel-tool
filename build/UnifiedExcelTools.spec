@@ -5,9 +5,9 @@ block_cipher = None
 
 datas = []
 datas += collect_data_files('customtkinter')
-datas += [('README.md','.')]
+datas += [('../README.md','.')]
 try:
-    datas += [('assets/icon.png','assets')]
+    datas += [('../assets/icon.png','assets')]
 except Exception:
     pass
 
@@ -20,4 +20,4 @@ a = Analysis(['../main.py'], pathex=[], binaries=[], datas=datas,
              hiddenimports=hiddenimports)
 pyz = PYZ(a.pure)
 exe = EXE(pyz,a.scripts,a.binaries,a.datas,name='UnifiedExcelTools',
-          console=False, icon='assets/icon.ico')
+          console=False, icon='../assets/icon.ico')
