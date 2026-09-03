@@ -3,6 +3,7 @@ import subprocess
 import sys
 import threading
 import traceback
+import webbrowser
 from pathlib import Path
 
 import customtkinter as ctk
@@ -15,6 +16,7 @@ from constants import (
     CONTROL_HEIGHT,
     SIDEBAR_WIDTH,
 )
+from core.update_checker import UpdateCheckError, check_for_updates
 from tools.dynamic_pivot import run_dynamic_pivot
 from tools.tab_splitter import run_tab_splitter
 from tools.workbook_splitter import run_workbook_splitter
@@ -93,6 +95,20 @@ class App(ctk.CTk):
             button.grid(row=row, column=0, sticky="ew", padx=14, pady=5)
             self.nav_buttons[name] = button
 
+        self.update_button = ctk.CTkButton(
+            self.sidebar,
+            text="Check for Updates",
+            height=34,
+            command=self.start_update_check,
+        )
+        self.update_button.grid(
+            row=29,
+            column=0,
+            sticky="ew",
+            padx=14,
+            pady=(10, 5),
+        )
+
         ctk.CTkLabel(
             self.sidebar,
             text=f"{APP_VERSION} | © {APP_ORGANIZATION}",
@@ -102,7 +118,7 @@ class App(ctk.CTk):
             column=0,
             sticky="ew",
             padx=16,
-            pady=(10, 5),
+            pady=(5, 12),
         )
 
     def _build_content(self):
@@ -315,3 +331,48 @@ class App(ctk.CTk):
                 subprocess.Popen(["xdg-open", folder])
         except OSError as exc:
             messagebox.showerror("Unable to Open Folder", str(exc))
+
+    def start_update_check(self):
+        self.update_button.configure(state="disabled", text="Checking...")
+        threading.Thread(target=self._update_check_worker, daemon=True).start()
+
+    def _update_check_worker(self):
+        try:
+            update_info = check_for_updates()
+        except UpdateCheckError as exc:
+            self.after(0, lambda error=str(exc): self._show_update_error(error))
+        except Exception:
+            self.after(
+                0,
+                lambda: self._show_update_error(
+                    "An unexpected error occurred while checking for updates."
+                ),
+            )
+        else:
+            self.after(0, lambda: self._show_update_result(update_info))
+
+    def _reset_update_button(self):
+        self.update_button.configure(state="normal", text="Check for Updates")
+
+    def _show_update_error(self, error):
+        self._reset_update_button()
+        messagebox.showerror("Unable to Check for Updates", error)
+
+    def _show_update_result(self, update_info):
+        self._reset_update_button()
+        if not update_info.update_available:
+            messagebox.showinfo(
+                "No Updates Available",
+                f"You're using the latest version ({APP_VERSION}).",
+            )
+            return
+
+        open_release = messagebox.askyesno(
+            "Update Available",
+            f"{update_info.release_name} is available.\n\n"
+            f"Installed version: {APP_VERSION}\n"
+            f"Latest version: {update_info.latest_version}\n\n"
+            "Open the download page?",
+        )
+        if open_release:
+            webbrowser.open(update_info.release_url)

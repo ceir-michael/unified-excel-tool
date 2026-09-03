@@ -16,6 +16,10 @@ Run the application:
 python main.py
 ```
 
+Use **Check for Updates** in the sidebar to compare the installed version with the
+latest published GitHub release. When an update is available, the app can open the
+release download page in your browser.
+
 ## Split into Tabs
 
 Creates a new workbook with separate worksheets based on the unique values in a selected column. You can specify which row contains the column headers.
