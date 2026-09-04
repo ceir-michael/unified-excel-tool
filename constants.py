@@ -1,5 +1,5 @@
 APP_NAME = "Unified Excel Tools"
-APP_VERSION = "0.2.0-beta"
+APP_VERSION = "0.3.0-beta"
 APP_ORGANIZATION = "Cizik School of Nursing - CEIR"
 APP_REPOSITORY = "ceir-michael/unified-excel-tool"
 
