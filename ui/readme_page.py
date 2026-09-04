@@ -48,12 +48,12 @@ class ReadmePage(FormPage):
             lmargin2=10,
         )
 
-        readme_path = resource_path("README.md")
+        readme_path = resource_path("ui/INSTRUCTIONS.md")
         if readme_path.exists():
             content = readme_path.read_text(encoding="utf-8")
             self._insert_markdown(content)
         else:
-            textbox.insert("end", "README.md could not be found.\n", "body")
+            textbox.insert("end", "INSTRUCTIONS.md could not be found.\n", "body")
 
         textbox.configure(state="disabled")
 
