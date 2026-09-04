@@ -13,19 +13,17 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\Unified Excel Tools
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
-OutputDir=..\dist\installer
+OutputDir=dist\installer
 OutputBaseFilename=UnifiedExcelTools-{#MyAppVersion}-Setup
-SetupIconFile=..\assets\icon.ico
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=lowest
-UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Files]
-Source: "..\dist\UnifiedExcelTools\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\UnifiedExcelTools\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
