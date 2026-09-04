@@ -14,13 +14,6 @@ hiddenimports = []
 hiddenimports += collect_submodules("openpyxl")
 hiddenimports += collect_submodules("customtkinter")
 
-if sys.platform == "win32":
-    icon = project_root / "assets" / "icon.ico"
-elif sys.platform == "darwin":
-    icon = project_root / "assets" / "icon.icns"
-else:
-    icon = None
-
 a = Analysis(
     [str(project_root / "main.py")],
     pathex=[str(project_root)],
@@ -36,7 +29,6 @@ exe = EXE(
     exclude_binaries=True,
     name="UnifiedExcelTools",
     console=False,
-    icon=str(icon) if icon else None,
     version=str(project_root / "build" / "version_info.txt")
     if sys.platform == "win32"
     else None,
