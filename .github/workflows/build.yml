@@ -15,6 +15,13 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements-build.txt
       - run: pyinstaller --clean build/UnifiedExcelTools.spec
+      - name: Build Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress --yes
+          $version = python -c "import constants; print(constants.APP_VERSION)"
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" "build\installer.iss"
       - uses: actions/upload-artifact@v4
         with:
           name: UnifiedExcelTools-${{ matrix.os }}
