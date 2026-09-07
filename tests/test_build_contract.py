@@ -11,7 +11,9 @@ class BuildContractTests(unittest.TestCase):
         self.assertIn('"INSTRUCTIONS.md"', spec)
         self.assertIn("COLLECT(", spec)
         self.assertIn("BUNDLE(", spec)
-        self.assertIn("version_info.txt", spec)
+        self.assertIn("unified-excel-tools-version-info.txt", spec)
+        self.assertNotIn("Path(WORKPATH)", spec)
+        self.assertIn("icon_candidate.stat().st_size > 0", spec)
 
     def test_github_build_runs_tests_smoke_checks_and_releases(self):
         workflow = (ROOT / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")

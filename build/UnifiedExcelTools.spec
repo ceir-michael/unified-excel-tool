@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 import sys
 import re
+import tempfile
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
@@ -9,11 +10,12 @@ PROJECT_ROOT = Path(SPECPATH).parent
 sys.path.insert(0, str(PROJECT_ROOT))
 from constants import APP_NAME, APP_ORGANIZATION, APP_VERSION
 
-icon = PROJECT_ROOT / "assets" / ("icon.ico" if sys.platform == "win32" else "icon.icns") if sys.platform in ("win32", "darwin") else None
+icon_candidate = PROJECT_ROOT / "assets" / ("icon.ico" if sys.platform == "win32" else "icon.icns") if sys.platform in ("win32", "darwin") else None
+icon = icon_candidate if icon_candidate and icon_candidate.is_file() and icon_candidate.stat().st_size > 0 else None
 version_resource = None
 if sys.platform == "win32":
     numeric = [int(part) for part in re.match(r"^v?(\d+)\.(\d+)\.(\d+)", APP_VERSION).groups()] + [0]
-    version_resource = Path(WORKPATH) / "version_info.txt"
+    version_resource = Path(tempfile.gettempdir()) / "unified-excel-tools-version-info.txt"
     version_resource.parent.mkdir(parents=True, exist_ok=True)
     version_resource.write_text(
         f"""VSVersionInfo(
@@ -72,6 +74,6 @@ if sys.platform == "darwin":
     application = BUNDLE(
         application,
         name="Unified Excel Tools.app",
-        icon=str(icon),
+        icon=str(icon) if icon else None,
         bundle_identifier="edu.uth.ceir.unified-excel-tools",
     )
