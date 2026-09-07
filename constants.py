@@ -1,6 +1,6 @@
 APP_NAME = "Unified Excel Tools"
 APP_VERSION = "v0.4.0-beta"
-APP_ORGANIZATION = "Cizik School of Nursing - CEIR"
+APP_ORGANIZATION = "Cizik School of Nursing"
 APP_REPOSITORY = "ceir-michael/unified-excel-tool"
 
 CONTROL_HEIGHT = 38

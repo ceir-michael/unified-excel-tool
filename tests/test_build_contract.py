@@ -36,6 +36,17 @@ class BuildContractTests(unittest.TestCase):
         self.assertNotIn("self.after", worker)
         self.assertNotIn("self.after", updater)
 
+    def test_how_to_use_page_receives_the_full_content_area(self):
+        app_source = (ROOT / "ui" / "app.py").read_text(encoding="utf-8")
+        readme_source = (ROOT / "ui" / "readme_page.py").read_text(encoding="utf-8")
+        show_page = app_source.split("    def show_page(", 1)[1].split("    def append_log", 1)[0]
+
+        self.assertIn('help_visible = name == "How to Use"', show_page)
+        self.assertIn("self.log_frame.grid_remove()", show_page)
+        self.assertIn("self.log_frame.grid()", show_page)
+        self.assertIn("class ReadmePage(ctk.CTkFrame)", readme_source)
+        self.assertIn("self.grid_rowconfigure(2, weight=1)", readme_source)
+
 
 if __name__ == "__main__":
     unittest.main()

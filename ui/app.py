@@ -238,7 +238,7 @@ class App(ctk.CTk):
             state="disabled",
             command=self.cancel_job,
         )
-        self.cancel_button.grid(row=0, column=1, sticky="e", padx=(10, 0))
+        self.cancel_button.grid(row=0, column=1, sticky="e", padx=(10, 12))
 
         self.run_button = ctk.CTkButton(
             action_row,
@@ -255,6 +255,16 @@ class App(ctk.CTk):
         page, task = self.pages[name]
         page.grid(row=0, column=0, sticky="nsew")
         self.current_name = name
+
+        help_visible = name == "How to Use"
+        if help_visible:
+            self.log_frame.grid_remove()
+            self.content.grid_rowconfigure(0, weight=1)
+            self.content.grid_rowconfigure(1, weight=0)
+        else:
+            self.log_frame.grid()
+            self.content.grid_rowconfigure(0, weight=3)
+            self.content.grid_rowconfigure(1, weight=2)
 
         for button_name, button in self.nav_buttons.items():
             button.configure(

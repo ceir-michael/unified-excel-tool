@@ -2,21 +2,30 @@ import customtkinter as ctk
 import re
 
 from core.file_utils import resource_path
-from ui.base_page import FormPage
 
 
-class ReadmePage(FormPage):
+class ReadmePage(ctk.CTkFrame):
     def __init__(self, master):
-        super().__init__(
-            master,
-            "How to Use",
-            "Application documentation and usage instructions.",
-        )
-
-        self.form.grid_remove()
+        super().__init__(master, fg_color="transparent")
+        self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)
 
-        self.textbox = ctk.CTkTextbox(self, wrap="word")
+        ctk.CTkLabel(
+            self,
+            text="How to Use",
+            font=ctk.CTkFont(size=26, weight="bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew", padx=4, pady=(4, 4))
+
+        ctk.CTkLabel(
+            self,
+            text="Application documentation and usage instructions.",
+            wraplength=760,
+            justify="left",
+            anchor="w",
+        ).grid(row=1, column=0, sticky="ew", padx=4, pady=(0, 18))
+
+        self.textbox = ctk.CTkTextbox(self, wrap="word", corner_radius=10)
         self.textbox.grid(
             row=2,
             column=0,
