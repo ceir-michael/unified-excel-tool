@@ -36,6 +36,12 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: python -m pip install -r requirements-build.txt
+      - name: Verify portable NumPy build
+        run: >-
+          python -c "import numpy as np;
+          version = tuple(map(int, np.__version__.split('.')[:2]));
+          assert version < (2, 4), 'NumPy 2.4+ requires X86_V2 on x86-64';
+          print('Portable NumPy version:', np.__version__)"
       - name: Validate sources
         run: python -m compileall -q core tools ui main.py constants.py
       - name: Run test suite

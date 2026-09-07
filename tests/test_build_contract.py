@@ -17,7 +17,10 @@ class BuildContractTests(unittest.TestCase):
 
     def test_github_build_runs_tests_smoke_checks_and_releases(self):
         workflow = (ROOT / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
+        requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
         self.assertIn("python -m unittest discover", workflow)
+        self.assertIn("Verify portable NumPy build", workflow)
+        self.assertIn("numpy>=1.26.4,<2.4", requirements)
         self.assertIn("UNIFIED_EXCEL_TOOLS_SMOKE_TEST", workflow)
         self.assertIn('"./dist/Unified Excel Tools/Unified Excel Tools"', workflow)
         self.assertIn('"./dist/Unified Excel Tools.app/Contents/MacOS/Unified Excel Tools"', workflow)
