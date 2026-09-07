@@ -1,21 +1,101 @@
-name: Cross Platform Build
+name: Build desktop apps
 on:
-  push:
   workflow_dispatch:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "v*"
+  pull_request:
+
+permissions:
+  contents: write
+
 jobs:
   build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - platform: Linux
+            runner: ubuntu-latest
+            asset: Unified-Excel-Tools-Linux.tar.gz
+          - platform: Windows
+            runner: windows-latest
+            asset: Unified-Excel-Tools-Windows.zip
+          - platform: macOS
+            runner: macos-latest
+            asset: Unified-Excel-Tools-macOS.zip
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
-      - run: pip install -r requirements-build.txt
-      - run: pyinstaller --clean build/UnifiedExcelTools.spec
-      - uses: actions/upload-artifact@v4
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements-build.txt
+      - name: Validate sources
+        run: python -m compileall -q core tools ui main.py constants.py
+      - name: Run test suite
+        run: python -m unittest discover -s tests -v
+      - name: Build one-directory application
+        run: python -m PyInstaller --noconfirm --clean build/UnifiedExcelTools.spec
+      - name: Smoke test Linux application
+        if: runner.os == 'Linux'
+        env:
+          UNIFIED_EXCEL_TOOLS_SMOKE_TEST: "1"
+        run: |
+          "./dist/Unified Excel Tools/Unified Excel Tools"
+      - name: Smoke test Windows application
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          UNIFIED_EXCEL_TOOLS_SMOKE_TEST: "1"
+        run: '& "dist/Unified Excel Tools/Unified Excel Tools.exe"'
+      - name: Smoke test macOS application
+        if: runner.os == 'macOS'
+        env:
+          UNIFIED_EXCEL_TOOLS_SMOKE_TEST: "1"
+        run: |
+          "./dist/Unified Excel Tools.app/Contents/MacOS/Unified Excel Tools"
+      - name: Package Linux application
+        if: runner.os == 'Linux'
+        run: tar -C dist -czf "${{ matrix.asset }}" "Unified Excel Tools"
+      - name: Package Windows application
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path 'dist/Unified Excel Tools' -DestinationPath '${{ matrix.asset }}'
+      - name: Package macOS application
+        if: runner.os == 'macOS'
+        run: ditto -c -k --sequesterRsrc --keepParent "dist/Unified Excel Tools.app" "${{ matrix.asset }}"
+      - uses: actions/upload-artifact@v7
         with:
-          name: UnifiedExcelTools-${{ matrix.os }}
-          path: dist/**
+          name: ${{ matrix.platform }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Create release and upload applications
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+              gh release create "${GITHUB_REF_NAME}" --verify-tag --generate-notes --prerelease
+            else
+              gh release create "${GITHUB_REF_NAME}" --verify-tag --generate-notes
+            fi
+          fi
+          gh release upload "${GITHUB_REF_NAME}" release-assets/* --clobber

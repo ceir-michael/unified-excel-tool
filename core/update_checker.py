@@ -60,7 +60,9 @@ def compare_versions(left: str, right: str) -> int:
     return (left_key > right_key) - (left_key < right_key)
 
 
-def _latest_release(releases: list) -> dict:
+def _latest_release(releases: list, include_prereleases: bool | None = None) -> dict:
+    if include_prereleases is None:
+        include_prereleases = _version_key(APP_VERSION)[3] == 0
     candidates = []
     for release in releases:
         if not isinstance(release, dict) or release.get("draft"):
@@ -70,6 +72,8 @@ def _latest_release(releases: list) -> dict:
         try:
             key = _version_key(version)
         except ValueError:
+            continue
+        if not include_prereleases and (release.get("prerelease") or key[3] == 0):
             continue
         candidates.append((key, release))
 
@@ -105,7 +109,10 @@ def check_for_updates(timeout: float = 10) -> UpdateInfo:
     if not isinstance(payload, list):
         raise UpdateCheckError("GitHub returned an invalid update response.")
 
-    latest_release = _latest_release(payload)
+    latest_release = _latest_release(
+        payload,
+        include_prereleases=_version_key(APP_VERSION)[3] == 0,
+    )
     latest_version = str(latest_release.get("tag_name", "")).strip()
     release_url = str(latest_release.get("html_url", "")).strip()
     release_name = str(latest_release.get("name") or latest_version).strip()

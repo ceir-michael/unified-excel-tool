@@ -26,6 +26,7 @@ build:linux:
     - python -m pip install --upgrade pip
     - python -m pip install -r requirements-build.txt
   script:
+    - python -m unittest discover -s tests -v
     - python -m PyInstaller --clean build/UnifiedExcelTools.spec
 
 build:windows:
@@ -36,6 +37,7 @@ build:windows:
     - python -m pip install --upgrade pip
     - python -m pip install -r requirements-build.txt
   script:
+    - python -m unittest discover -s tests -v
     - python -m PyInstaller --clean build/UnifiedExcelTools.spec
 
 build:macos:
@@ -46,4 +48,5 @@ build:macos:
     - python3 -m pip install --upgrade pip
     - python3 -m pip install -r requirements-build.txt
   script:
+    - python3 -m unittest discover -s tests -v
     - python3 -m PyInstaller --clean build/UnifiedExcelTools.spec

@@ -5,6 +5,7 @@ import pandas as pd
 from tkinter import messagebox
 
 from constants import CONTROL_HEIGHT
+from core.file_utils import require_distinct_paths
 from ui.base_page import FormPage
 from ui.widgets import FilePicker
 
@@ -166,6 +167,8 @@ class PivotPage(FormPage):
         header_row = int(self.header.get())
         if header_row < 1:
             raise ValueError("Header row must be 1 or greater.")
+
+        require_distinct_paths(Path(self.input_file.get()), Path(self.output_file.get()))
 
         return {
             "input_file": self.input_file.get(),

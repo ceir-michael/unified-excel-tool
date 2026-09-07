@@ -1,4 +1,7 @@
 from copy import copy
+from pathlib import Path
+
+from openpyxl import load_workbook
 
 
 def copy_cell(source, target) -> None:
@@ -30,3 +33,30 @@ def find_header_column(ws, header_name: str, header_row: int = 1) -> int | None:
             return column
 
     return None
+
+
+def worksheet_headers(ws, header_row: int = 1) -> dict[str, int]:
+    """Return unambiguous worksheet headers and reject duplicates."""
+    headers: dict[str, int] = {}
+    folded: dict[str, str] = {}
+    for column in range(1, ws.max_column + 1):
+        value = ws.cell(row=header_row, column=column).value
+        if value is None or not str(value).strip():
+            continue
+        name = str(value).strip()
+        key = name.casefold()
+        if key in folded:
+            raise ValueError(
+                f"Duplicate header '{name}' was found. Rename duplicate columns before continuing."
+            )
+        folded[key] = name
+        headers[name] = column
+    return headers
+
+
+def read_active_sheet_headers(path: Path, header_row: int) -> list[str]:
+    workbook = load_workbook(path, read_only=True, data_only=False)
+    try:
+        return list(worksheet_headers(workbook.active, header_row))
+    finally:
+        workbook.close()

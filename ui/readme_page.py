@@ -1,4 +1,5 @@
 import customtkinter as ctk
+import re
 
 from core.file_utils import resource_path
 from ui.base_page import FormPage
@@ -47,6 +48,10 @@ class ReadmePage(FormPage):
             lmargin1=10,
             lmargin2=10,
         )
+        textbox._textbox.tag_config("h3", font=("Segoe UI", 13, "bold"), spacing1=8, spacing3=4)
+        textbox._textbox.tag_config("list", font=("Segoe UI", 12), lmargin1=18, lmargin2=36)
+        textbox._textbox.tag_config("bold", font=("Segoe UI", 12, "bold"))
+        textbox._textbox.tag_config("code", font=("Consolas", 11), background="#333333")
 
         readme_path = resource_path("ui/INSTRUCTIONS.md")
         if readme_path.exists():
@@ -58,14 +63,35 @@ class ReadmePage(FormPage):
         textbox.configure(state="disabled")
 
     def _insert_markdown(self, content: str):
-        """Render basic Markdown headings and paragraphs in the textbox."""
+        """Render the lightweight Markdown used by the packaged help document."""
+        inline = re.compile(r"(`[^`]+`|\*\*[^*]+\*\*)")
+
+        def insert_inline(value, base_tag):
+            position = 0
+            for match in inline.finditer(value):
+                self.textbox.insert("end", value[position:match.start()], base_tag)
+                token = match.group(0)
+                tag = "code" if token.startswith("`") else "bold"
+                width = 1 if tag == "code" else 2
+                self.textbox.insert("end", token[width:-width], (base_tag, tag))
+                position = match.end()
+            self.textbox.insert("end", value[position:], base_tag)
+
         for line in content.splitlines():
             stripped = line.strip()
             if stripped.startswith("# "):
-                self.textbox.insert("end", stripped[2:] + "\n", "h1")
+                insert_inline(stripped[2:], "h1")
             elif stripped.startswith("## "):
-                self.textbox.insert("end", stripped[3:] + "\n", "h2")
+                insert_inline(stripped[3:], "h2")
+            elif stripped.startswith("### "):
+                insert_inline(stripped[4:], "h3")
+            elif stripped.startswith(("- ", "* ")):
+                insert_inline("•  " + stripped[2:], "list")
+            elif match := re.match(r"^(\d+\.)\s+(.*)$", stripped):
+                insert_inline(f"{match.group(1)}  {match.group(2)}", "list")
             elif stripped:
-                self.textbox.insert("end", stripped + "\n", "body")
+                insert_inline(stripped, "body")
             else:
                 self.textbox.insert("end", "\n")
+                continue
+            self.textbox.insert("end", "\n")

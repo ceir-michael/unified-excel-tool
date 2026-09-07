@@ -5,6 +5,8 @@ import threading
 import traceback
 import webbrowser
 from pathlib import Path
+from queue import Empty, Queue
+from threading import Event
 
 import customtkinter as ctk
 from tkinter import messagebox
@@ -16,6 +18,8 @@ from constants import (
     CONTROL_HEIGHT,
     SIDEBAR_WIDTH,
 )
+from core.diagnostics import log_exception
+from core.file_utils import OperationCancelled
 from core.update_checker import UpdateCheckError, check_for_updates
 from tools.dynamic_pivot import run_dynamic_pivot
 from tools.tab_splitter import run_tab_splitter
@@ -41,6 +45,11 @@ class App(ctk.CTk):
         self.last_folder: Path | None = None
         self.current_name = "How to Use"
         self.nav_buttons = {}
+        self.events: Queue[tuple] = Queue()
+        self.active_job: str | None = None
+        self.cancel_event = Event()
+        self.worker_thread: threading.Thread | None = None
+        self.close_when_finished = False
 
         self.grid_columnconfigure(0, minsize=SIDEBAR_WIDTH)
         self.grid_columnconfigure(1, weight=1)
@@ -51,6 +60,8 @@ class App(ctk.CTk):
         self._build_pages()
         self._build_log_area()
         self.show_page(self.current_name)
+        self.protocol("WM_DELETE_WINDOW", self.request_close)
+        self.after(50, self._poll_events)
 
     def _build_sidebar(self):
         self.sidebar = ctk.CTkFrame(
@@ -220,6 +231,15 @@ class App(ctk.CTk):
         )
         self.open_button.grid(row=0, column=0, sticky="w")
 
+        self.cancel_button = ctk.CTkButton(
+            action_row,
+            text="Cancel",
+            height=CONTROL_HEIGHT,
+            state="disabled",
+            command=self.cancel_job,
+        )
+        self.cancel_button.grid(row=0, column=1, sticky="e", padx=(10, 0))
+
         self.run_button = ctk.CTkButton(
             action_row,
             text="Run Selected Tool",
@@ -243,16 +263,20 @@ class App(ctk.CTk):
                 else "transparent"
             )
 
-        self.run_button.configure(state="normal" if task else "disabled")
+        self.run_button.configure(
+            state="normal" if task and self.active_job is None else "disabled"
+        )
 
     def append_log(self, text):
-        def update():
-            self.log.insert("end", text + "\n")
-            self.log.see("end")
-
-        self.after(0, update)
+        self.events.put(("log", str(text)))
 
     def run_selected(self):
+        if self.active_job is not None:
+            messagebox.showwarning(
+                "Operation in Progress",
+                f"Wait for '{self.active_job}' to finish or cancel it before starting another tool.",
+            )
+            return
         page, task = self.pages[self.current_name]
         if task is None:
             return
@@ -263,59 +287,137 @@ class App(ctk.CTk):
             messagebox.showwarning("Invalid Input", str(exc))
             return
 
+        if self.current_name in ("Split into Tabs", "Dynamic Pivot Worksheet"):
+            proceed = messagebox.askokcancel(
+                "Workbook Feature Notice",
+                "This operation creates a new tabular workbook. Original formulas, formatting, "
+                "merged cells, validation rules, images, and macros are not preserved.\n\nContinue?",
+            )
+        else:
+            proceed = messagebox.askokcancel(
+                "Workbook Feature Notice",
+                "Basic cell styles, comments, hyperlinks, and column widths are copied. Other "
+                "workbook features and formula references may require review.\n\nContinue?",
+            )
+        if not proceed:
+            return
+        output_file = params.get("output_file")
+        if output_file and Path(output_file).exists() and not messagebox.askyesno(
+            "Replace Existing Output?",
+            f"Replace the existing workbook?\n\n{Path(output_file).resolve()}",
+            icon="warning",
+            default="no",
+        ):
+            return
+
         self.log.delete("1.0", "end")
         self.status.configure(text=f"Running {self.current_name}...")
+        self.active_job = self.current_name
+        self.cancel_event.clear()
         self.run_button.configure(state="disabled")
+        self.cancel_button.configure(state="normal", text="Cancel")
+        self.update_button.configure(state="disabled")
         self.progress.start()
 
-        threading.Thread(
+        self.worker_thread = threading.Thread(
             target=self.worker,
-            args=(task, params),
-            daemon=True,
-        ).start()
+            args=(task, params, self.current_name),
+            daemon=False,
+        )
+        self.worker_thread.start()
 
-    def worker(self, task, params):
+    def worker(self, task, params, job_name):
         try:
-            result = task(params, self.append_log)
-
-            if "output_folder" in params:
-                self.last_folder = Path(params["output_folder"])
-            elif "output_file" in params:
-                self.last_folder = Path(params["output_file"]).parent
-            else:
-                self.last_folder = Path(params["input_file"]).parent
-
-            self.after(0, lambda: self.success(result))
-        except Exception:
+            result = task(params, self.append_log, self.cancel_event.is_set)
+        except BaseException as exc:
             details = traceback.format_exc()
-            self.append_log(details)
-            self.after(0, lambda: self.failure(details))
+            log_path = log_exception(f"{job_name} failed", exc)
+            self.events.put(("failure", details, log_path, isinstance(exc, OperationCancelled)))
+        else:
+            self.events.put(("success", result, params, job_name))
 
-    def success(self, result):
+    def _poll_events(self):
+        try:
+            while True:
+                event = self.events.get_nowait()
+                kind = event[0]
+                if kind == "log":
+                    self.log.insert("end", event[1] + "\n")
+                    self.log.see("end")
+                elif kind == "success":
+                    self.success(*event[1:])
+                elif kind == "failure":
+                    self.failure(*event[1:])
+                elif kind == "update_success":
+                    self._show_update_result(event[1])
+                elif kind == "update_failure":
+                    self._show_update_error(event[1], event[2])
+        except Empty:
+            pass
+        if self.close_when_finished and self.active_job is None:
+            return
+        if self.winfo_exists():
+            self.after(50, self._poll_events)
+
+    def _finish_job(self):
         self.progress.stop()
         self.progress.set(0)
-        self.status.configure(text="Completed")
-
+        self.active_job = None
+        self.worker_thread = None
+        self.cancel_event.clear()
+        self.cancel_button.configure(state="disabled", text="Cancel")
+        self.update_button.configure(state="normal")
         current_task = self.pages[self.current_name][1]
         self.run_button.configure(
             state="normal" if current_task is not None else "disabled"
         )
+        if self.close_when_finished:
+            self.destroy()
+            return True
+        return False
+
+    def success(self, result, params, job_name):
+        if "output_folder" in params:
+            self.last_folder = Path(params["output_folder"])
+        elif "output_file" in params:
+            self.last_folder = Path(params["output_file"]).parent
+        else:
+            self.last_folder = Path(params["input_file"]).parent
+        self.status.configure(text=f"Completed: {job_name}")
+        if self._finish_job():
+            return
         self.open_button.configure(state="normal")
         messagebox.showinfo("Completed", result)
 
-    def failure(self, details):
-        self.progress.stop()
-        self.progress.set(0)
-        self.status.configure(text="Failed")
+    def failure(self, details, log_path, cancelled=False):
+        self.log.insert("end", details + "\n")
+        self.log.see("end")
+        self.status.configure(text="Cancelled" if cancelled else "Failed")
+        if self._finish_job():
+            return
+        if cancelled:
+            messagebox.showinfo("Operation Cancelled", "The operation was cancelled. Existing output was not replaced.")
+            return
+        diagnostic = f"\n\nDiagnostic log: {log_path}" if log_path else ""
+        messagebox.showerror("Processing Failed", details.strip().splitlines()[-1] + diagnostic)
 
-        current_task = self.pages[self.current_name][1]
-        self.run_button.configure(
-            state="normal" if current_task is not None else "disabled"
-        )
-        messagebox.showerror(
-            "Processing Failed",
-            details.strip().splitlines()[-1],
-        )
+    def cancel_job(self):
+        if self.active_job is None:
+            return
+        self.cancel_event.set()
+        self.cancel_button.configure(state="disabled", text="Cancelling...")
+        self.status.configure(text=f"Cancelling {self.active_job} after the current workbook step...")
+
+    def request_close(self):
+        if self.active_job is None:
+            self.destroy()
+            return
+        if messagebox.askyesno(
+            "Operation in Progress",
+            f"Cancel '{self.active_job}' and close after the current workbook step finishes?",
+        ):
+            self.close_when_finished = True
+            self.cancel_job()
 
     def open_folder(self):
         if not self.last_folder:
@@ -333,6 +435,9 @@ class App(ctk.CTk):
             messagebox.showerror("Unable to Open Folder", str(exc))
 
     def start_update_check(self):
+        if self.active_job is not None:
+            messagebox.showwarning("Operation in Progress", "Wait for the workbook operation to finish before checking for updates.")
+            return
         self.update_button.configure(state="disabled", text="Checking...")
         threading.Thread(target=self._update_check_worker, daemon=True).start()
 
@@ -340,23 +445,19 @@ class App(ctk.CTk):
         try:
             update_info = check_for_updates()
         except UpdateCheckError as exc:
-            self.after(0, lambda error=str(exc): self._show_update_error(error))
-        except Exception:
-            self.after(
-                0,
-                lambda: self._show_update_error(
-                    "An unexpected error occurred while checking for updates."
-                ),
-            )
+            self.events.put(("update_failure", str(exc), None))
+        except Exception as exc:
+            self.events.put(("update_failure", "An unexpected error occurred while checking for updates.", log_exception("Update check failed", exc)))
         else:
-            self.after(0, lambda: self._show_update_result(update_info))
+            self.events.put(("update_success", update_info))
 
     def _reset_update_button(self):
         self.update_button.configure(state="normal", text="Check for Updates")
 
-    def _show_update_error(self, error):
+    def _show_update_error(self, error, log_path=None):
         self._reset_update_button()
-        messagebox.showerror("Unable to Check for Updates", error)
+        diagnostic = f"\n\nDiagnostic log: {log_path}" if log_path else ""
+        messagebox.showerror("Unable to Check for Updates", error + diagnostic)
 
     def _show_update_result(self, update_info):
         self._reset_update_button()

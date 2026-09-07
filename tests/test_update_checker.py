@@ -48,6 +48,16 @@ class LatestReleaseTests(unittest.TestCase):
         with self.assertRaises(UpdateCheckError):
             _latest_release([])
 
+    def test_stable_channel_ignores_prereleases(self):
+        releases = [
+            {"tag_name": "v2.0.0-beta.1", "draft": False, "prerelease": True},
+            {"tag_name": "v1.5.0", "draft": False, "prerelease": False},
+        ]
+        self.assertEqual(
+            _latest_release(releases, include_prereleases=False)["tag_name"],
+            "v1.5.0",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

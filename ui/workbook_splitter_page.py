@@ -1,10 +1,10 @@
 from pathlib import Path
 
 import customtkinter as ctk
-import pandas as pd
 from tkinter import messagebox
 
 from constants import CONTROL_HEIGHT
+from core.excel_helpers import read_active_sheet_headers
 from ui.base_page import FormPage
 from ui.widgets import FilePicker
 
@@ -75,12 +75,7 @@ class WorkbookSplitterPage(FormPage):
             if header_row < 1:
                 raise ValueError("Header row must be 1 or greater.")
 
-            columns = pd.read_excel(
-                self.input_file.get(),
-                header=header_row - 1,
-                nrows=0,
-            ).columns
-            values = [str(column) for column in columns]
+            values = read_active_sheet_headers(Path(self.input_file.get()), header_row)
 
             if not values:
                 raise ValueError("No columns were found in the selected header row.")
